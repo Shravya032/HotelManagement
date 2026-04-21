@@ -1,0 +1,31 @@
+.welcome-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+}
+
+.welcome-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 40px;
+  border-radius: 20px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  color: white;
+}
+
+.btn-group button {
+  margin: 10px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #00c6ff;
+  color: white;
+  cursor: pointer;
+}
+
+.btn-group button:hover {
+  background: #0072ff;
+}
