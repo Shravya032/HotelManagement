@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { createReservation } from "../services/api";
 
 function ReservationForm() {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ function ReservationForm() {
         return;
       }
 
-      await axios.post("http://localhost:8080/reservations", {
+      await createReservation({
         guestName: data.guestName,
         roomNumber: parseInt(data.roomNumber),
         contactNumber: data.contactNumber
@@ -28,8 +28,7 @@ function ReservationForm() {
 
       alert("Reservation added successfully!");
 
-      navigate("/dashboard"); // 🔥 back to dashboard
-
+      navigate("/dashboard");
     } catch (error) {
       console.error(error);
       alert("Error while adding reservation");
@@ -40,7 +39,7 @@ function ReservationForm() {
     <div className="container">
       <h2>Add Reservation</h2>
 
-      {/* 🔷 Guest Name */}
+      {/* Guest Name */}
       <input
         placeholder="Guest Name"
         value={data.guestName}
@@ -49,7 +48,7 @@ function ReservationForm() {
         }
       />
 
-      {/* 🔷 Room Number */}
+      {/* Room Number */}
       <input
         placeholder="Room Number"
         value={data.roomNumber}
@@ -58,7 +57,7 @@ function ReservationForm() {
         }
       />
 
-      {/* 🔷 Contact Number */}
+      {/* Contact Number */}
       <input
         placeholder="Contact Number"
         value={data.contactNumber}

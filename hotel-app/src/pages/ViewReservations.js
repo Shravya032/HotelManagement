@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { getAllReservations } from "../services/api";
 
 function ViewReservations() {
   const navigate = useNavigate();
   const [list, setList] = useState([]);
 
   useEffect(() => {
-    axios.get("http://localhost:8080/reservations")
-      .then(res => setList(res.data));
+    const fetchReservations = async () => {
+      try {
+        const res = await getAllReservations();
+        setList(res.data || []);
+      } catch (err) {
+        console.error("Error loading reservations:", err);
+      }
+    };
+    fetchReservations();
   }, []);
 
   return (
@@ -16,7 +23,7 @@ function ViewReservations() {
       <h2>Reservations</h2>
 
       {list.map(r => (
-        <div key={r.reservationId}>
+        <div key={r.reservationId || r.id}>
           {r.guestName} - Room {r.roomNumber}
         </div>
       ))}

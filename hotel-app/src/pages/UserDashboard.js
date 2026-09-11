@@ -253,7 +253,7 @@ function UserDashboard() {
             ) : (
               <div className="rooms-grid">
                 {filteredRooms.map((room) => (
-                  <div key={room.roomId} className="room-card">
+                  <div key={room.roomId || room.id || room.roomNumber} className="room-card">
                     <img
                       src={room.imageUrl ? getFileUrl(room.imageUrl) : "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80"}
                       alt={room.roomType}
