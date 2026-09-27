@@ -8,10 +8,11 @@ function ReservationForm() {
   const user = JSON.parse(localStorage.getItem("currentUser"));
 
   const [data, setData] = useState({
-    guestName: user ? user.username : "",
-    roomNumber: "",
-    contactNumber: ""
-  });
+  guestName: user ? user.username : "",
+  guestEmail: user ? user.username : "",
+  roomNumber: "",
+  contactNumber: ""
+});
 
   const handleSubmit = async () => {
     try {

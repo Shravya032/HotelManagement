@@ -17,6 +17,7 @@ public class ReservationService {
     @PostConstruct
     public void initSampleReservations() {
         if (repo.count() == 0) {
+
             repo.save(new Reservation(
                     "Sarah Jenkins",
                     "sarah.j@example.com",
@@ -58,61 +59,120 @@ public class ReservationService {
         }
     }
 
+    // CREATE RESERVATION
     public Reservation reserveRoom(Reservation r) {
+
         if (r.getStatus() == null || r.getStatus().isEmpty()) {
             r.setStatus("CONFIRMED");
         }
+
         return repo.save(r);
     }
 
+    // GET ALL RESERVATIONS
+    // Used by ADMIN
     public List<Reservation> getAllReservations() {
         return repo.findAll();
     }
 
+    // GET RESERVATIONS BY GUEST NAME
+    // Used by USER
     public List<Reservation> getReservationsByGuest(String guestName) {
         return repo.findByGuestNameContainingIgnoreCase(guestName);
     }
 
+    // GET RESERVATIONS BY EMAIL
+    public List<Reservation> getReservationsByEmail(String guestEmail) {
+        return repo.findByGuestEmail(guestEmail);
+    }
+
+    // GET RESERVATION BY ID
     public Reservation getById(int id) {
         return repo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found with ID: " + id));
+                .orElseThrow(() ->
+                        new RuntimeException("Reservation not found with ID: " + id));
     }
 
+    // UPDATE RESERVATION
     public Reservation updateReservation(int id, Reservation r) {
+
         Reservation existing = getById(id);
 
-        if (r.getGuestName() != null) existing.setGuestName(r.getGuestName());
-        if (r.getGuestEmail() != null) existing.setGuestEmail(r.getGuestEmail());
-        if (r.getRoomNumber() != 0) existing.setRoomNumber(r.getRoomNumber());
-        if (r.getRoomType() != null) existing.setRoomType(r.getRoomType());
-        if (r.getContactNumber() != null) existing.setContactNumber(r.getContactNumber());
-        if (r.getCheckInDate() != null) existing.setCheckInDate(r.getCheckInDate());
-        if (r.getCheckOutDate() != null) existing.setCheckOutDate(r.getCheckOutDate());
-        if (r.getTotalPrice() > 0) existing.setTotalPrice(r.getTotalPrice());
-        if (r.getStatus() != null) existing.setStatus(r.getStatus());
-        if (r.getSpecialRequests() != null) existing.setSpecialRequests(r.getSpecialRequests());
-        if (r.getDocumentUrl() != null) existing.setDocumentUrl(r.getDocumentUrl());
+        if (r.getGuestName() != null) {
+            existing.setGuestName(r.getGuestName());
+        }
+
+        if (r.getGuestEmail() != null) {
+            existing.setGuestEmail(r.getGuestEmail());
+        }
+
+        if (r.getRoomNumber() != 0) {
+            existing.setRoomNumber(r.getRoomNumber());
+        }
+
+        if (r.getRoomType() != null) {
+            existing.setRoomType(r.getRoomType());
+        }
+
+        if (r.getContactNumber() != null) {
+            existing.setContactNumber(r.getContactNumber());
+        }
+
+        if (r.getCheckInDate() != null) {
+            existing.setCheckInDate(r.getCheckInDate());
+        }
+
+        if (r.getCheckOutDate() != null) {
+            existing.setCheckOutDate(r.getCheckOutDate());
+        }
+
+        if (r.getTotalPrice() > 0) {
+            existing.setTotalPrice(r.getTotalPrice());
+        }
+
+        if (r.getStatus() != null) {
+            existing.setStatus(r.getStatus());
+        }
+
+        if (r.getSpecialRequests() != null) {
+            existing.setSpecialRequests(r.getSpecialRequests());
+        }
+
+        if (r.getDocumentUrl() != null) {
+            existing.setDocumentUrl(r.getDocumentUrl());
+        }
 
         return repo.save(existing);
     }
 
+    // UPDATE STATUS
     public Reservation updateStatus(int id, String newStatus) {
+
         Reservation existing = getById(id);
+
         existing.setStatus(newStatus);
+
         return repo.save(existing);
     }
 
+    // UPDATE DOCUMENT
     public Reservation updateDocument(int id, String documentUrl) {
+
         Reservation existing = getById(id);
+
         existing.setDocumentUrl(documentUrl);
+
         return repo.save(existing);
     }
 
+    // DELETE RESERVATION
     public boolean deleteReservation(int id) {
+
         if (repo.existsById(id)) {
             repo.deleteById(id);
             return true;
         }
+
         return false;
     }
 }
