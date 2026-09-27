@@ -1,178 +1,429 @@
 package com.hotel.service;
 
 import com.hotel.entity.Reservation;
+import com.hotel.entity.Room;
 import com.hotel.repository.ReservationRepository;
-import jakarta.annotation.PostConstruct;
+import com.hotel.repository.RoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ReservationService {
 
     @Autowired
-    private ReservationRepository repo;
+    private ReservationRepository reservationRepository;
 
-    @PostConstruct
-    public void initSampleReservations() {
-        if (repo.count() == 0) {
+    @Autowired
+    private RoomRepository roomRepository;
 
-            repo.save(new Reservation(
-                    "Sarah Jenkins",
-                    "sarah.j@example.com",
-                    101,
-                    "Deluxe Sea View Suite",
-                    "9876543210",
-                    "2026-09-10",
-                    "2026-09-15",
-                    1100.0,
-                    "CONFIRMED",
-                    "Late check-in requested (after 8 PM)."
-            ));
 
-            repo.save(new Reservation(
-                    "Michael Vance",
-                    "m.vance@example.com",
-                    102,
-                    "Executive King Suite",
-                    "9123456789",
-                    "2026-09-12",
-                    "2026-09-14",
-                    360.0,
-                    "CHECKED_IN",
-                    "High floor, away from elevator."
-            ));
-
-            repo.save(new Reservation(
-                    "Emma Watson",
-                    "emma.w@example.com",
-                    201,
-                    "Presidential Royal Penthouse",
-                    "9988776655",
-                    "2026-09-20",
-                    "2026-09-23",
-                    1350.0,
-                    "PENDING",
-                    "Champagne package on arrival."
-            ));
-        }
-    }
-
-    // CREATE RESERVATION
-    public Reservation reserveRoom(Reservation r) {
-
-        if (r.getStatus() == null || r.getStatus().isEmpty()) {
-            r.setStatus("CONFIRMED");
-        }
-
-        return repo.save(r);
-    }
-
+    // =========================================================
     // GET ALL RESERVATIONS
-    // Used by ADMIN
+    // =========================================================
+
     public List<Reservation> getAllReservations() {
-        return repo.findAll();
+        return reservationRepository.findAll();
     }
 
-    // GET RESERVATIONS BY GUEST NAME
-    // Used by USER
-    public List<Reservation> getReservationsByGuest(String guestName) {
-        return repo.findByGuestNameContainingIgnoreCase(guestName);
-    }
 
-    // GET RESERVATIONS BY EMAIL
-    public List<Reservation> getReservationsByEmail(String guestEmail) {
-        return repo.findByGuestEmail(guestEmail);
-    }
-
+    // =========================================================
     // GET RESERVATION BY ID
-    public Reservation getById(int id) {
-        return repo.findById(id)
+    // =========================================================
+
+    public Reservation getReservationById(int id) {
+        return reservationRepository.findById(id)
                 .orElseThrow(() ->
                         new RuntimeException("Reservation not found with ID: " + id));
     }
 
+
+    // =========================================================
+    // GET RESERVATIONS BY GUEST NAME
+    // =========================================================
+
+    public List<Reservation> getReservationsByGuest(String guestName) {
+        return reservationRepository.findByGuestName(guestName);
+    }
+
+
+    // =========================================================
+    // GET RESERVATIONS BY EMAIL
+    // =========================================================
+
+    public List<Reservation> getReservationsByEmail(String email) {
+        return reservationRepository.findByGuestEmail(email);
+    }
+
+
+    // =========================================================
+    // GET RESERVATIONS BY USERNAME
+    // =========================================================
+
+    public List<Reservation> getReservationsByUser(String username) {
+        return reservationRepository.findByOwnerUsername(username);
+    }
+
+
+    // =========================================================
+    // DATE VALIDATION
+    // =========================================================
+
+    private void validateDates(Reservation reservation) {
+
+        if (reservation.getCheckInDate() == null ||
+                reservation.getCheckInDate().trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Check-in date is required"
+            );
+        }
+
+        if (reservation.getCheckOutDate() == null ||
+                reservation.getCheckOutDate().trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Check-out date is required"
+            );
+        }
+
+        if (reservation.getRoomNumber() <= 0) {
+
+            throw new IllegalArgumentException(
+                    "Valid room number is required"
+            );
+        }
+
+        try {
+
+            LocalDate checkIn =
+                    LocalDate.parse(reservation.getCheckInDate());
+
+            LocalDate checkOut =
+                    LocalDate.parse(reservation.getCheckOutDate());
+
+            if (!checkOut.isAfter(checkIn)) {
+
+                throw new IllegalArgumentException(
+                        "Check-out date must be after check-in date"
+                );
+            }
+
+        } catch (DateTimeParseException e) {
+
+            throw new IllegalArgumentException(
+                    "Dates must be in yyyy-MM-dd format"
+            );
+        }
+    }
+
+
+    // =========================================================
+    // CHECK ROOM AVAILABILITY
+    // =========================================================
+
+    public boolean isRoomAvailable(
+            int roomNumber,
+            String checkInDate,
+            String checkOutDate,
+            Integer reservationId) {
+
+        List<Reservation> overlapping =
+                reservationRepository.findOverlappingReservations(
+                        roomNumber,
+                        checkInDate,
+                        checkOutDate
+                );
+
+        for (Reservation reservation : overlapping) {
+
+            // Ignore the same reservation while editing
+            if (reservationId != null &&
+                    reservation.getReservationId() == reservationId) {
+
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+
+    // =========================================================
+    // CREATE RESERVATION
+    // =========================================================
+
+    public Reservation createReservation(Reservation reservation) {
+
+        validateDates(reservation);
+
+        if (reservation.getOwnerUsername() == null ||
+                reservation.getOwnerUsername().trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Owner username is required"
+            );
+        }
+
+        reservation.setOwnerUsername(
+                reservation.getOwnerUsername().trim()
+        );
+
+        // Check whether room exists
+        Room room = roomRepository
+                .findByRoomNumber(reservation.getRoomNumber())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Room " + reservation.getRoomNumber()
+                                        + " does not exist"
+                        )
+                );
+
+        // Room under maintenance cannot be booked
+        if ("MAINTENANCE".equalsIgnoreCase(room.getStatus())) {
+
+            throw new IllegalArgumentException(
+                    "Room " + room.getRoomNumber()
+                            + " is currently under maintenance"
+            );
+        }
+
+        // Check overlapping reservation
+        if (!isRoomAvailable(
+                reservation.getRoomNumber(),
+                reservation.getCheckInDate(),
+                reservation.getCheckOutDate(),
+                null)) {
+
+            throw new IllegalArgumentException(
+                    "Room " + reservation.getRoomNumber()
+                            + " is already booked for the selected dates"
+            );
+        }
+
+        if (reservation.getStatus() == null ||
+                reservation.getStatus().trim().isEmpty()) {
+
+            reservation.setStatus("CONFIRMED");
+        }
+
+        return reservationRepository.save(reservation);
+    }
+
+
+    // =========================================================
     // UPDATE RESERVATION
-    public Reservation updateReservation(int id, Reservation r) {
+    // =========================================================
 
-        Reservation existing = getById(id);
+    public Reservation updateReservation(
+            int id,
+            Reservation details) {
 
-        if (r.getGuestName() != null) {
-            existing.setGuestName(r.getGuestName());
+        validateDates(details);
+
+        Reservation existing =
+                reservationRepository.findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Reservation not found with ID: " + id
+                                )
+                        );
+
+        // Keep old owner username if the frontend doesn't send it
+        String ownerUsername = details.getOwnerUsername();
+
+        if (ownerUsername == null ||
+                ownerUsername.trim().isEmpty()) {
+
+            ownerUsername = existing.getOwnerUsername();
         }
 
-        if (r.getGuestEmail() != null) {
-            existing.setGuestEmail(r.getGuestEmail());
+        if (ownerUsername == null ||
+                ownerUsername.trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Owner username is required"
+            );
         }
 
-        if (r.getRoomNumber() != 0) {
-            existing.setRoomNumber(r.getRoomNumber());
+        // Check room exists
+        Room room = roomRepository
+                .findByRoomNumber(details.getRoomNumber())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Room " + details.getRoomNumber()
+                                        + " does not exist"
+                        )
+                );
+
+        // Check maintenance
+        if ("MAINTENANCE".equalsIgnoreCase(room.getStatus())) {
+
+            throw new IllegalArgumentException(
+                    "Room " + room.getRoomNumber()
+                            + " is currently under maintenance"
+            );
         }
 
-        if (r.getRoomType() != null) {
-            existing.setRoomType(r.getRoomType());
+        // Check overlapping reservation
+        if (!isRoomAvailable(
+                details.getRoomNumber(),
+                details.getCheckInDate(),
+                details.getCheckOutDate(),
+                id)) {
+
+            throw new IllegalArgumentException(
+                    "Room " + details.getRoomNumber()
+                            + " is already booked for the selected dates"
+            );
         }
 
-        if (r.getContactNumber() != null) {
-            existing.setContactNumber(r.getContactNumber());
+        existing.setOwnerUsername(ownerUsername.trim());
+
+        existing.setGuestName(details.getGuestName());
+        existing.setGuestEmail(details.getGuestEmail());
+
+        existing.setRoomNumber(details.getRoomNumber());
+        existing.setRoomType(details.getRoomType());
+
+        existing.setContactNumber(details.getContactNumber());
+
+        existing.setCheckInDate(details.getCheckInDate());
+        existing.setCheckOutDate(details.getCheckOutDate());
+
+        existing.setTotalPrice(details.getTotalPrice());
+
+        existing.setStatus(
+                details.getStatus() == null ||
+                        details.getStatus().trim().isEmpty()
+                        ? "CONFIRMED"
+                        : details.getStatus()
+        );
+
+        existing.setSpecialRequests(details.getSpecialRequests());
+
+        // Preserve existing document if no new document is supplied
+        if (details.getDocumentUrl() != null &&
+                !details.getDocumentUrl().trim().isEmpty()) {
+
+            existing.setDocumentUrl(details.getDocumentUrl());
         }
 
-        if (r.getCheckInDate() != null) {
-            existing.setCheckInDate(r.getCheckInDate());
-        }
-
-        if (r.getCheckOutDate() != null) {
-            existing.setCheckOutDate(r.getCheckOutDate());
-        }
-
-        if (r.getTotalPrice() > 0) {
-            existing.setTotalPrice(r.getTotalPrice());
-        }
-
-        if (r.getStatus() != null) {
-            existing.setStatus(r.getStatus());
-        }
-
-        if (r.getSpecialRequests() != null) {
-            existing.setSpecialRequests(r.getSpecialRequests());
-        }
-
-        if (r.getDocumentUrl() != null) {
-            existing.setDocumentUrl(r.getDocumentUrl());
-        }
-
-        return repo.save(existing);
+        return reservationRepository.save(existing);
     }
 
+
+    // =========================================================
     // UPDATE STATUS
-    public Reservation updateStatus(int id, String newStatus) {
+    // =========================================================
 
-        Reservation existing = getById(id);
+    public Reservation updateStatus(
+            int id,
+            String status) {
 
-        existing.setStatus(newStatus);
+        Reservation reservation =
+                reservationRepository.findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Reservation not found with ID: " + id
+                                )
+                        );
 
-        return repo.save(existing);
-    }
+        if (status == null ||
+                status.trim().isEmpty()) {
 
-    // UPDATE DOCUMENT
-    public Reservation updateDocument(int id, String documentUrl) {
-
-        Reservation existing = getById(id);
-
-        existing.setDocumentUrl(documentUrl);
-
-        return repo.save(existing);
-    }
-
-    // DELETE RESERVATION
-    public boolean deleteReservation(int id) {
-
-        if (repo.existsById(id)) {
-            repo.deleteById(id);
-            return true;
+            throw new IllegalArgumentException(
+                    "Status is required"
+            );
         }
 
-        return false;
+        reservation.setStatus(status);
+
+        return reservationRepository.save(reservation);
+    }
+
+
+    // =========================================================
+    // DELETE RESERVATION
+    // =========================================================
+
+    public void deleteReservation(int id) {
+
+        if (!reservationRepository.existsById(id)) {
+
+            throw new RuntimeException(
+                    "Reservation not found with ID: " + id
+            );
+        }
+
+        reservationRepository.deleteById(id);
+    }
+
+
+    // =========================================================
+    // GET AVAILABLE ROOMS FOR SELECTED DATES
+    // =========================================================
+
+    public List<Room> getAvailableRoomsForDates(
+            String checkInDate,
+            String checkOutDate) {
+
+        if (checkInDate == null ||
+                checkInDate.trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Check-in date is required"
+            );
+        }
+
+        if (checkOutDate == null ||
+                checkOutDate.trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Check-out date is required"
+            );
+        }
+
+        try {
+
+            LocalDate checkIn =
+                    LocalDate.parse(checkInDate);
+
+            LocalDate checkOut =
+                    LocalDate.parse(checkOutDate);
+
+            if (!checkOut.isAfter(checkIn)) {
+
+                throw new IllegalArgumentException(
+                        "Check-out date must be after check-in date"
+                );
+            }
+
+        } catch (DateTimeParseException e) {
+
+            throw new IllegalArgumentException(
+                    "Dates must be in yyyy-MM-dd format"
+            );
+        }
+
+        List<Room> availableRooms =
+                roomRepository.findByStatus("AVAILABLE");
+
+        return availableRooms.stream()
+                .filter(room ->
+                        isRoomAvailable(
+                                room.getRoomNumber(),
+                                checkInDate,
+                                checkOutDate,
+                                null
+                        )
+                )
+                .collect(Collectors.toList());
     }
 }

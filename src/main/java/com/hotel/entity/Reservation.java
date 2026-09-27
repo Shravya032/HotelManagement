@@ -10,6 +10,15 @@ public class Reservation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int reservationId;
 
+    // =========================
+    // USER WHO OWNS THIS BOOKING
+    // =========================
+    @Column(name = "owner_username", nullable = false)
+    private String ownerUsername;
+
+    // =========================
+    // GUEST DETAILS
+    // =========================
     @Column(name = "guest_name", nullable = false)
     private String guestName;
 
@@ -35,7 +44,7 @@ public class Reservation {
     private double totalPrice;
 
     @Column(name = "status")
-    private String status = "CONFIRMED"; // CONFIRMED, PENDING, CANCELLED, CHECKED_IN, CHECKED_OUT
+    private String status = "CONFIRMED";
 
     @Column(name = "special_requests", length = 500)
     private String specialRequests;
@@ -43,9 +52,23 @@ public class Reservation {
     @Column(name = "document_url", length = 500)
     private String documentUrl;
 
-    public Reservation() {}
+    public Reservation() {
+    }
 
-    public Reservation(String guestName, String guestEmail, int roomNumber, String roomType, String contactNumber, String checkInDate, String checkOutDate, double totalPrice, String status, String specialRequests) {
+    public Reservation(
+            String ownerUsername,
+            String guestName,
+            String guestEmail,
+            int roomNumber,
+            String roomType,
+            String contactNumber,
+            String checkInDate,
+            String checkOutDate,
+            double totalPrice,
+            String status,
+            String specialRequests) {
+
+        this.ownerUsername = ownerUsername;
         this.guestName = guestName;
         this.guestEmail = guestEmail;
         this.roomNumber = roomNumber;
@@ -64,6 +87,14 @@ public class Reservation {
 
     public void setReservationId(int reservationId) {
         this.reservationId = reservationId;
+    }
+
+    public String getOwnerUsername() {
+        return ownerUsername;
+    }
+
+    public void setOwnerUsername(String ownerUsername) {
+        this.ownerUsername = ownerUsername;
     }
 
     public String getGuestName() {

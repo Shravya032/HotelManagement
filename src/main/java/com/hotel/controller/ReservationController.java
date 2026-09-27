@@ -1,29 +1,22 @@
 package com.hotel.controller;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
 import com.hotel.entity.Reservation;
+import com.hotel.entity.Room;
 import com.hotel.service.FileStorageService;
 import com.hotel.service.ReservationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
-@CrossOrigin(origins = "*")
 @RequestMapping("/reservations")
+@CrossOrigin(origins = "*")
 public class ReservationController {
 
     @Autowired
@@ -32,131 +25,306 @@ public class ReservationController {
     @Autowired
     private FileStorageService fileStorageService;
 
-    // =========================================================
-    // CREATE RESERVATION
-    // =========================================================
-
-    @PostMapping
-    public ResponseEntity<Reservation> reserveRoom(
-            @RequestBody Reservation r) {
-
-        Reservation created = service.reserveRoom(r);
-
-        return ResponseEntity.ok(created);
-    }
 
     // =========================================================
-    // GET ALL RESERVATIONS
-    // ADMIN ONLY
+    // GET ALL
     // =========================================================
 
     @GetMapping
-    public List<Reservation> getAll() {
+    public ResponseEntity<List<Reservation>> getAllReservations() {
 
-        return service.getAllReservations();
+        return ResponseEntity.ok(
+                service.getAllReservations()
+        );
     }
 
-    // =========================================================
-    // GET RESERVATIONS FOR ONE USER
-    // USER
-    // Example:
-    // /reservations/guest/Shravya
-    // =========================================================
-
-    @GetMapping("/guest/{name}")
-    public List<Reservation> getByGuest(
-            @PathVariable String name) {
-
-        return service.getReservationsByGuest(name);
-    }
 
     // =========================================================
-    // GET RESERVATIONS BY EMAIL
-    // =========================================================
-
-    @GetMapping("/email/{email}")
-    public List<Reservation> getByEmail(
-            @PathVariable String email) {
-
-        return service.getReservationsByEmail(email);
-    }
-
-    // =========================================================
-    // GET RESERVATION BY ID
+    // GET BY ID
     // =========================================================
 
     @GetMapping("/{id}")
-    public ResponseEntity<Reservation> getById(
+    public ResponseEntity<?> getReservationById(
             @PathVariable int id) {
 
-        return ResponseEntity.ok(service.getById(id));
+        try {
+
+            return ResponseEntity.ok(
+                    service.getReservationById(id)
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(createError(e.getMessage()));
+        }
     }
 
+
     // =========================================================
-    // UPDATE RESERVATION
+    // GET BY GUEST NAME
+    // =========================================================
+
+    @GetMapping("/guest/{guestName}")
+    public ResponseEntity<List<Reservation>> getByGuest(
+            @PathVariable String guestName) {
+
+        return ResponseEntity.ok(
+                service.getReservationsByGuest(guestName)
+        );
+    }
+
+
+    // =========================================================
+    // GET BY EMAIL
+    // =========================================================
+
+    @GetMapping("/email/{email}")
+    public ResponseEntity<List<Reservation>> getByEmail(
+            @PathVariable String email) {
+
+        return ResponseEntity.ok(
+                service.getReservationsByEmail(email)
+        );
+    }
+
+
+    // =========================================================
+    // GET BY USERNAME
+    // =========================================================
+
+    @GetMapping("/user/{username}")
+    public ResponseEntity<List<Reservation>> getByUser(
+            @PathVariable String username) {
+
+        return ResponseEntity.ok(
+                service.getReservationsByUser(username)
+        );
+    }
+
+
+    // =========================================================
+    // GET AVAILABLE ROOMS FOR DATES
+    // =========================================================
+
+    @GetMapping("/available-rooms")
+    public ResponseEntity<?> getAvailableRoomsForDates(
+            @RequestParam String checkInDate,
+            @RequestParam String checkOutDate) {
+
+        try {
+
+            List<Room> rooms =
+                    service.getAvailableRoomsForDates(
+                            checkInDate,
+                            checkOutDate
+                    );
+
+            return ResponseEntity.ok(rooms);
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(createError(e.getMessage()));
+        }
+    }
+
+
+    // =========================================================
+    // CREATE
+    // =========================================================
+
+    @PostMapping
+    public ResponseEntity<?> createReservation(
+            @RequestBody Reservation reservation) {
+
+        try {
+
+            Reservation created =
+                    service.createReservation(reservation);
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(created);
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(createError(e.getMessage()));
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createError(
+                            "Unable to create reservation"
+                    ));
+        }
+    }
+
+
+    // =========================================================
+    // UPDATE
     // =========================================================
 
     @PutMapping("/{id}")
-    public ResponseEntity<Reservation> update(
+    public ResponseEntity<?> updateReservation(
             @PathVariable int id,
-            @RequestBody Reservation r) {
+            @RequestBody Reservation reservation) {
 
-        Reservation updated =
-                service.updateReservation(id, r);
+        try {
 
-        return ResponseEntity.ok(updated);
+            Reservation updated =
+                    service.updateReservation(
+                            id,
+                            reservation
+                    );
+
+            return ResponseEntity.ok(updated);
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(createError(e.getMessage()));
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(createError(e.getMessage()));
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createError(
+                            "Unable to update reservation"
+                    ));
+        }
     }
+
 
     // =========================================================
     // UPDATE STATUS
     // =========================================================
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<Reservation> updateStatus(
+    public ResponseEntity<?> updateStatus(
             @PathVariable int id,
             @RequestParam String status) {
 
-        Reservation updated =
-                service.updateStatus(id, status);
+        try {
 
-        return ResponseEntity.ok(updated);
+            Reservation updated =
+                    service.updateStatus(
+                            id,
+                            status
+                    );
+
+            return ResponseEntity.ok(updated);
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(createError(e.getMessage()));
+        }
     }
+
+
+    // =========================================================
+    // DELETE
+    // =========================================================
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteReservation(
+            @PathVariable int id) {
+
+        try {
+
+            service.deleteReservation(id);
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Reservation deleted successfully"
+                    )
+            );
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(createError(e.getMessage()));
+        }
+    }
+
 
     // =========================================================
     // UPLOAD DOCUMENT
     // =========================================================
 
     @PostMapping("/{id}/upload-document")
-    public ResponseEntity<Reservation> uploadDocument(
+    public ResponseEntity<?> uploadDocument(
             @PathVariable int id,
             @RequestParam("file") MultipartFile file) {
 
-        String fileUrl =
-                fileStorageService.storeFile(file);
+        try {
 
-        Reservation updated =
-                service.updateDocument(id, fileUrl);
+            String fileUrl =
+                    fileStorageService.storeFile(file);
 
-        return ResponseEntity.ok(updated);
+            Reservation reservation =
+                    service.getReservationById(id);
+
+            reservation.setDocumentUrl(fileUrl);
+
+            Reservation updated =
+                    service.updateReservation(
+                            id,
+                            reservation
+                    );
+
+            return ResponseEntity.ok(updated);
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createError(
+                            "Unable to upload document"
+                    ));
+        }
     }
 
+
     // =========================================================
-    // DELETE RESERVATION
+    // ERROR RESPONSE
     // =========================================================
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<String> delete(
-            @PathVariable int id) {
+    private Map<String, String> createError(
+            String message) {
 
-        boolean deleted =
-                service.deleteReservation(id);
+        Map<String, String> response =
+                new HashMap<>();
 
-        if (deleted) {
-            return ResponseEntity.ok(
-                    "Reservation deleted successfully"
-            );
-        }
+        response.put(
+                "message",
+                message == null
+                        ? "Unknown error"
+                        : message
+        );
 
-        return ResponseEntity.notFound().build();
+        return response;
     }
 }
