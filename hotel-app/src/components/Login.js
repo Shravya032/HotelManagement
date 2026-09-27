@@ -1,13 +1,32 @@
-
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { loginUser } from "../services/api";
-import { Building, ArrowRight, AlertCircle } from "lucide-react";
+import {
+  Building,
+  ArrowRight,
+  AlertCircle,
+  ShieldAlert,
+  User
+} from "lucide-react";
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+
+  /*
+   * Determine which login was selected from Welcome page.
+   *
+   * ADMIN  -> Admin Module
+   * USER   -> User View
+   *
+   * If someone directly opens /login without selecting
+   * anything, USER login is used as the default.
+   */
+  const loginType = location.state?.loginType || "USER";
+
+  const isAdminLogin = loginType === "ADMIN";
 
   const [credentials, setCredentials] = useState({
     username: "",
@@ -31,8 +50,35 @@ function Login() {
 
       const userData = response.data;
 
+      /*
+       * IMPORTANT:
+       * Check the actual role returned by the backend.
+       *
+       * This prevents a normal USER account from entering
+       * the Admin Module and prevents ADMIN from entering
+       * through User View.
+       */
+
+      if (isAdminLogin && userData.role !== "ADMIN") {
+        setError(
+          "This account is not an administrator. Please use the User View."
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (!isAdminLogin && userData.role === "ADMIN") {
+        setError(
+          "Administrator account detected. Please use the Admin Module."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Save authenticated user
       login(userData);
 
+      // Redirect according to actual backend role
       if (userData.role === "ADMIN") {
         navigate("/admin");
       } else {
@@ -43,7 +89,9 @@ function Login() {
       if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
-        setError("Unable to connect to the server. Please try again.");
+        setError(
+          "Unable to connect to the server. Please try again."
+        );
       }
     } finally {
       setLoading(false);
@@ -65,9 +113,12 @@ function Login() {
         style={{
           width: "100%",
           maxWidth: "440px",
-          border: "1px solid var(--border-gold)"
+          border: isAdminLogin
+            ? "1px solid var(--border-gold)"
+            : "1px solid rgba(59, 130, 246, 0.4)"
         }}
       >
+
         {/* HEADER */}
         <div
           style={{
@@ -75,6 +126,8 @@ function Login() {
             marginBottom: "28px"
           }}
         >
+
+          {/* ICON */}
           <div
             className="brand-icon"
             style={{
@@ -84,18 +137,24 @@ function Login() {
               borderRadius: "14px"
             }}
           >
-            <Building size={28} />
+            {isAdminLogin ? (
+              <ShieldAlert size={28} />
+            ) : (
+              <User size={28} />
+            )}
           </div>
 
+          {/* TITLE */}
           <h2
             style={{
               fontSize: "1.6rem",
               fontWeight: 800
             }}
           >
-            Welcome Back
+            {isAdminLogin ? "Admin Login" : "User Login"}
           </h2>
 
+          {/* DESCRIPTION */}
           <p
             style={{
               color: "var(--text-muted)",
@@ -103,7 +162,9 @@ function Login() {
               marginTop: "4px"
             }}
           >
-            Access Grand Horizon Hotel Portal
+            {isAdminLogin
+              ? "Access the Grand Horizon Administrator Portal"
+              : "Access your Grand Horizon Hotel account"}
           </p>
         </div>
 
@@ -137,6 +198,7 @@ function Login() {
             gap: "16px"
           }}
         >
+
           {/* USERNAME / EMAIL */}
           <div>
             <label
@@ -153,13 +215,18 @@ function Login() {
             <input
               type="text"
               required
-              placeholder="Enter username or email"
+              placeholder={
+                isAdminLogin
+                  ? "Enter admin username or email"
+                  : "Enter username or email"
+              }
               value={credentials.username}
               onChange={(e) => {
                 setCredentials({
                   ...credentials,
                   username: e.target.value
                 });
+
                 setError("");
               }}
             />
@@ -188,6 +255,7 @@ function Login() {
                   ...credentials,
                   password: e.target.value
                 });
+
                 setError("");
               }}
             />
@@ -209,38 +277,63 @@ function Login() {
               "Signing In..."
             ) : (
               <>
-                Sign In <ArrowRight size={16} />
+                {isAdminLogin ? "Admin Sign In" : "Sign In"}
+                <ArrowRight size={16} />
               </>
             )}
           </button>
         </form>
 
-        {/* SIGNUP */}
+        {/* USER SIGNUP */}
+        {!isAdminLogin && (
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: "20px",
+              fontSize: "0.85rem",
+              color: "var(--text-muted)"
+            }}
+          >
+            Don't have an account?{" "}
+
+            <span
+              onClick={() => navigate("/signup")}
+              style={{
+                color: "var(--primary-gold)",
+                cursor: "pointer",
+                fontWeight: 700
+              }}
+            >
+              Create Account
+            </span>
+          </div>
+        )}
+
+        {/* BACK TO HOME */}
         <div
           style={{
             textAlign: "center",
-            marginTop: "20px",
-            fontSize: "0.85rem",
-            color: "var(--text-muted)"
+            marginTop: "18px"
           }}
         >
-          Don't have an account?{" "}
-
-          <span
-            onClick={() => navigate("/signup")}
+          <button
+            type="button"
+            onClick={() => navigate("/")}
             style={{
-              color: "var(--primary-gold)",
+              background: "none",
+              border: "none",
+              color: "var(--text-muted)",
               cursor: "pointer",
-              fontWeight: 700
+              fontSize: "0.82rem"
             }}
           >
-            Create Account
-          </span>
+            ← Back to Home
+          </button>
         </div>
+
       </div>
     </div>
   );
 }
 
 export default Login;
-
