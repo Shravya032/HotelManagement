@@ -6,16 +6,158 @@ const RESERVATION_URL = `${BASE_URL}/reservations`;
 const ROOM_URL = `${BASE_URL}/api/rooms`;
 const AUTH_URL = `${BASE_URL}/api/auth`;
 
+// =====================================================
+// DEMO / OFFLINE FALLBACK DATA & HELPERS
+// =====================================================
+
+const INITIAL_ROOMS = [
+  {
+    id: 101,
+    roomNumber: "101",
+    roomType: "DELUXE",
+    pricePerNight: 250,
+    available: true,
+    maxOccupancy: 2,
+    imageUrl: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80",
+    description: "Luxury Deluxe Room with Ocean View and King Size Bed."
+  },
+  {
+    id: 102,
+    roomNumber: "102",
+    roomType: "SUITE",
+    pricePerNight: 450,
+    available: true,
+    maxOccupancy: 4,
+    imageUrl: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
+    description: "Spacious Executive Suite with Private Balcony and Jacuzzi."
+  },
+  {
+    id: 103,
+    roomNumber: "103",
+    roomType: "PRESIDENTIAL",
+    pricePerNight: 850,
+    available: true,
+    maxOccupancy: 6,
+    imageUrl: "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80",
+    description: "Top-floor Presidential Suite with Panoramic Sea Views and Private Chef Service."
+  },
+  {
+    id: 104,
+    roomNumber: "104",
+    roomType: "STANDARD",
+    pricePerNight: 150,
+    available: true,
+    maxOccupancy: 2,
+    imageUrl: "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
+    description: "Comfortable Standard King Room with City View."
+  },
+  {
+    id: 105,
+    roomNumber: "105",
+    roomType: "FAMILY",
+    pricePerNight: 350,
+    available: true,
+    maxOccupancy: 5,
+    imageUrl: "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
+    description: "Spacious Family Villa with Garden Access."
+  }
+];
+
+const INITIAL_RESERVATIONS = [
+  {
+    id: 1,
+    guestName: "John Doe",
+    email: "john@example.com",
+    username: "johndoe",
+    roomNumber: "101",
+    roomType: "DELUXE",
+    checkInDate: "2026-10-01",
+    checkOutDate: "2026-10-05",
+    numberOfGuests: 2,
+    totalPrice: 1000,
+    status: "CONFIRMED"
+  }
+];
+
+const getDemoRooms = () => {
+  const stored = localStorage.getItem("demo_rooms");
+  if (!stored) {
+    localStorage.setItem("demo_rooms", JSON.stringify(INITIAL_ROOMS));
+    return INITIAL_ROOMS;
+  }
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return INITIAL_ROOMS;
+  }
+};
+
+const saveDemoRooms = (rooms) => {
+  localStorage.setItem("demo_rooms", JSON.stringify(rooms));
+};
+
+const getDemoReservations = () => {
+  const stored = localStorage.getItem("demo_reservations");
+  if (!stored) {
+    localStorage.setItem("demo_reservations", JSON.stringify(INITIAL_RESERVATIONS));
+    return INITIAL_RESERVATIONS;
+  }
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return INITIAL_RESERVATIONS;
+  }
+};
+
+const saveDemoReservations = (res) => {
+  localStorage.setItem("demo_reservations", JSON.stringify(res));
+};
+
+// Helper to catch connection errors and run fallback
+const withFallback = async (apiCall, fallbackFn) => {
+  try {
+    return await apiCall();
+  } catch (err) {
+    // If backend responded with an HTTP status code (400, 401, 500, etc.), throw original error
+    if (err.response) {
+      throw err;
+    }
+    // Network / server unreachable: use client-side demo fallback
+    console.warn("Backend server unreachable. Using Demo Fallback Mode.");
+    return { data: fallbackFn() };
+  }
+};
+
 
 // =====================================================
 // AUTH
 // =====================================================
 
 export const loginUser = (data) =>
-  axios.post(`${AUTH_URL}/login`, data);
+  withFallback(
+    () => axios.post(`${AUTH_URL}/login`, data),
+    () => {
+      const input = (data.usernameOrEmail || "").trim().toLowerCase();
+      const isAdmin = input.includes("admin");
+      return {
+        id: isAdmin ? 1 : Date.now(),
+        username: data.usernameOrEmail || (isAdmin ? "admin" : "guest"),
+        email: isAdmin ? "admin@grandhorizon.com" : `${data.usernameOrEmail || "guest"}@example.com`,
+        role: isAdmin ? "ADMIN" : "USER"
+      };
+    }
+  );
 
 export const registerUser = (data) =>
-  axios.post(`${AUTH_URL}/register`, data);
+  withFallback(
+    () => axios.post(`${AUTH_URL}/register`, data),
+    () => ({
+      id: Date.now(),
+      username: data.username,
+      email: data.email,
+      role: "USER"
+    })
+  );
 
 
 // =====================================================
@@ -23,67 +165,102 @@ export const registerUser = (data) =>
 // =====================================================
 
 export const getAllReservations = () =>
-  axios.get(RESERVATION_URL);
+  withFallback(
+    () => axios.get(RESERVATION_URL),
+    () => getDemoReservations()
+  );
 
-export const getAll = () =>
-  axios.get(RESERVATION_URL);
+export const getAll = getAllReservations;
 
 export const getReservationsByGuest = (guestName) =>
-  axios.get(
-    `${RESERVATION_URL}/guest/${encodeURIComponent(guestName)}`
+  withFallback(
+    () => axios.get(`${RESERVATION_URL}/guest/${encodeURIComponent(guestName)}`),
+    () => getDemoReservations().filter((r) => r.guestName?.toLowerCase() === guestName?.toLowerCase())
   );
 
 export const getReservationsByEmail = (email) =>
-  axios.get(
-    `${RESERVATION_URL}/email/${encodeURIComponent(email)}`
+  withFallback(
+    () => axios.get(`${RESERVATION_URL}/email/${encodeURIComponent(email)}`),
+    () => getDemoReservations().filter((r) => r.email?.toLowerCase() === email?.toLowerCase())
   );
 
 export const getReservationsByUser = (username) =>
-  axios.get(
-    `${RESERVATION_URL}/user/${encodeURIComponent(username)}`
+  withFallback(
+    () => axios.get(`${RESERVATION_URL}/user/${encodeURIComponent(username)}`),
+    () =>
+      getDemoReservations().filter(
+        (r) =>
+          (r.username || r.guestName)?.toLowerCase() === username?.toLowerCase()
+      )
   );
 
 export const createReservation = (data) =>
-  axios.post(RESERVATION_URL, data);
+  withFallback(
+    () => axios.post(RESERVATION_URL, data),
+    () => {
+      const current = getDemoReservations();
+      const newRes = {
+        id: Date.now(),
+        ...data,
+        status: data.status || "CONFIRMED"
+      };
+      saveDemoReservations([newRes, ...current]);
+      return newRes;
+    }
+  );
 
-export const addReservation = (data) =>
-  axios.post(RESERVATION_URL, data);
+export const addReservation = createReservation;
 
 export const getReservationById = (id) =>
-  axios.get(`${RESERVATION_URL}/${id}`);
+  withFallback(
+    () => axios.get(`${RESERVATION_URL}/${id}`),
+    () => getDemoReservations().find((r) => String(r.id) === String(id)) || null
+  );
 
 export const updateReservation = (id, data) =>
-  axios.put(`${RESERVATION_URL}/${id}`, data);
+  withFallback(
+    () => axios.put(`${RESERVATION_URL}/${id}`, data),
+    () => {
+      const current = getDemoReservations();
+      const updated = current.map((r) => (String(r.id) === String(id) ? { ...r, ...data } : r));
+      saveDemoReservations(updated);
+      return data;
+    }
+  );
 
 export const updateReservationStatus = (id, status) =>
-  axios.patch(
-    `${RESERVATION_URL}/${id}/status`,
-    null,
-    {
-      params: { status }
+  withFallback(
+    () => axios.patch(`${RESERVATION_URL}/${id}/status`, null, { params: { status } }),
+    () => {
+      const current = getDemoReservations();
+      const updated = current.map((r) => (String(r.id) === String(id) ? { ...r, status } : r));
+      saveDemoReservations(updated);
+      return { id, status };
     }
   );
 
 export const deleteReservation = (id) =>
-  axios.delete(`${RESERVATION_URL}/${id}`);
+  withFallback(
+    () => axios.delete(`${RESERVATION_URL}/${id}`),
+    () => {
+      const current = getDemoReservations();
+      saveDemoReservations(current.filter((r) => String(r.id) !== String(id)));
+      return true;
+    }
+  );
 
 
 // =====================================================
 // AVAILABLE ROOMS FOR SELECTED DATES
 // =====================================================
 
-export const getAvailableRoomsForDates = (
-  checkInDate,
-  checkOutDate
-) =>
-  axios.get(
-    `${RESERVATION_URL}/available-rooms`,
-    {
-      params: {
-        checkInDate,
-        checkOutDate
-      }
-    }
+export const getAvailableRoomsForDates = (checkInDate, checkOutDate) =>
+  withFallback(
+    () =>
+      axios.get(`${RESERVATION_URL}/available-rooms`, {
+        params: { checkInDate, checkOutDate }
+      }),
+    () => getDemoRooms().filter((r) => r.available)
   );
 
 
@@ -91,18 +268,13 @@ export const getAvailableRoomsForDates = (
 // DOCUMENT UPLOAD
 // =====================================================
 
-export const uploadReservationDocument = (
-  id,
-  formData
-) =>
-  axios.post(
-    `${RESERVATION_URL}/${id}/upload-document`,
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data"
-      }
-    }
+export const uploadReservationDocument = (id, formData) =>
+  withFallback(
+    () =>
+      axios.post(`${RESERVATION_URL}/${id}/upload-document`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      }),
+    () => ({ documentUrl: "demo_guest_id.pdf" })
   );
 
 
@@ -111,40 +283,67 @@ export const uploadReservationDocument = (
 // =====================================================
 
 export const getAllRooms = () =>
-  axios.get(ROOM_URL);
+  withFallback(
+    () => axios.get(ROOM_URL),
+    () => getDemoRooms()
+  );
 
 export const getAvailableRooms = () =>
-  axios.get(`${ROOM_URL}/available`);
+  withFallback(
+    () => axios.get(`${ROOM_URL}/available`),
+    () => getDemoRooms().filter((r) => r.available)
+  );
 
 export const getRoomById = (id) =>
-  axios.get(`${ROOM_URL}/${id}`);
+  withFallback(
+    () => axios.get(`${ROOM_URL}/${id}`),
+    () => getDemoRooms().find((r) => String(r.id) === String(id)) || null
+  );
 
 export const createRoom = (data) =>
-  axios.post(ROOM_URL, data);
+  withFallback(
+    () => axios.post(ROOM_URL, data),
+    () => {
+      const current = getDemoRooms();
+      const newRoom = { id: Date.now(), ...data };
+      saveDemoRooms([...current, newRoom]);
+      return newRoom;
+    }
+  );
 
 export const updateRoom = (id, data) =>
-  axios.put(`${ROOM_URL}/${id}`, data);
+  withFallback(
+    () => axios.put(`${ROOM_URL}/${id}`, data),
+    () => {
+      const current = getDemoRooms();
+      const updated = current.map((r) => (String(r.id) === String(id) ? { ...r, ...data } : r));
+      saveDemoRooms(updated);
+      return data;
+    }
+  );
 
 export const deleteRoom = (id) =>
-  axios.delete(`${ROOM_URL}/${id}`);
+  withFallback(
+    () => axios.delete(`${ROOM_URL}/${id}`),
+    () => {
+      const current = getDemoRooms();
+      saveDemoRooms(current.filter((r) => String(r.id) !== String(id)));
+      return true;
+    }
+  );
 
 
 // =====================================================
 // ROOM IMAGE UPLOAD
 // =====================================================
 
-export const uploadRoomImage = (
-  id,
-  formData
-) =>
-  axios.post(
-    `${ROOM_URL}/${id}/upload-image`,
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data"
-      }
-    }
+export const uploadRoomImage = (id, formData) =>
+  withFallback(
+    () =>
+      axios.post(`${ROOM_URL}/${id}/upload-image`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      }),
+    () => ({ imageUrl: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80" })
   );
 
 
@@ -153,14 +352,9 @@ export const uploadRoomImage = (
 // =====================================================
 
 export const getFileUrl = (fileUrl) => {
-
-  if (!fileUrl) {
-    return "";
-  }
-
-  if (fileUrl.startsWith("http")) {
+  if (!fileUrl) return "";
+  if (fileUrl.startsWith("http") || fileUrl.startsWith("data:")) {
     return fileUrl;
   }
-
   return `${BASE_URL}${fileUrl}`;
 };
