@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8080";
+const BASE_URL = (process.env.REACT_APP_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
 
 const RESERVATION_URL = `${BASE_URL}/reservations`;
 const ROOM_URL = `${BASE_URL}/api/rooms`;
