@@ -113,6 +113,12 @@ const saveDemoReservations = (res) => {
   localStorage.setItem("demo_reservations", JSON.stringify(res));
 };
 
+// Check if two date ranges overlap
+const isDateOverlap = (checkIn1, checkOut1, checkIn2, checkOut2) => {
+  if (!checkIn1 || !checkOut1 || !checkIn2 || !checkOut2) return false;
+  return checkIn1 < checkOut2 && checkIn2 < checkOut1;
+};
+
 // Helper to catch connection errors and run fallback
 const withFallback = async (apiCall, fallbackFn) => {
   try {
@@ -199,6 +205,25 @@ export const createReservation = (data) =>
     () => axios.post(RESERVATION_URL, data),
     () => {
       const current = getDemoReservations();
+
+      // Check if room is already booked for overlapping dates
+      const overlapping = current.find(
+        (r) =>
+          r.status !== "CANCELLED" &&
+          String(r.roomNumber) === String(data.roomNumber) &&
+          isDateOverlap(data.checkInDate, data.checkOutDate, r.checkInDate, r.checkOutDate)
+      );
+
+      if (overlapping) {
+        const error = new Error(`Room ${data.roomNumber} is already booked from ${overlapping.checkInDate} to ${overlapping.checkOutDate}.`);
+        error.response = {
+          data: {
+            message: `Room ${data.roomNumber} is already booked from ${overlapping.checkInDate} to ${overlapping.checkOutDate}.`
+          }
+        };
+        throw error;
+      }
+
       const newRes = {
         id: Date.now(),
         ...data,
@@ -260,7 +285,20 @@ export const getAvailableRoomsForDates = (checkInDate, checkOutDate) =>
       axios.get(`${RESERVATION_URL}/available-rooms`, {
         params: { checkInDate, checkOutDate }
       }),
-    () => getDemoRooms().filter((r) => r.available)
+    () => {
+      const rooms = getDemoRooms().filter((r) => r.available);
+      const reservations = getDemoReservations().filter((r) => r.status !== "CANCELLED");
+
+      // Filter out rooms that have an active reservation overlapping [checkInDate, checkOutDate]
+      return rooms.filter((room) => {
+        const hasOverlap = reservations.some(
+          (res) =>
+            String(res.roomNumber) === String(room.roomNumber) &&
+            isDateOverlap(checkInDate, checkOutDate, res.checkInDate, res.checkOutDate)
+        );
+        return !hasOverlap;
+      });
+    }
   );
 
 
