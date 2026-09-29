@@ -203,7 +203,7 @@ public class ReservationService {
 
             throw new IllegalArgumentException(
                     "Room " + reservation.getRoomNumber()
-                            + " is already booked for the selected dates"
+                            + " is not available for these dates"
             );
         }
 
@@ -280,7 +280,7 @@ public class ReservationService {
 
             throw new IllegalArgumentException(
                     "Room " + details.getRoomNumber()
-                            + " is already booked for the selected dates"
+                            + " is not available for these dates"
             );
         }
 

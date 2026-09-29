@@ -620,7 +620,7 @@ function UserDashboard() {
         (prev) =>
           prev.filter(
             (booking) =>
-              booking.reservationId !== id
+              (booking.reservationId || booking.id) !== id
           )
       );
 

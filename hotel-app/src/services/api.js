@@ -66,6 +66,7 @@ const INITIAL_ROOMS = [
 const INITIAL_RESERVATIONS = [
   {
     id: 1,
+    reservationId: 1,
     guestName: "John Doe",
     email: "john@example.com",
     username: "johndoe",
@@ -78,6 +79,13 @@ const INITIAL_RESERVATIONS = [
     status: "CONFIRMED"
   }
 ];
+
+// Helper to safely match reservation IDs (handling both reservationId and id)
+const matchesId = (item, targetId) => {
+  if (targetId === undefined || targetId === null) return false;
+  const itemId = item.reservationId ?? item.id;
+  return String(itemId) === String(targetId);
+};
 
 const getDemoRooms = () => {
   const stored = localStorage.getItem("demo_rooms");
@@ -103,7 +111,12 @@ const getDemoReservations = () => {
     return INITIAL_RESERVATIONS;
   }
   try {
-    return JSON.parse(stored);
+    const list = JSON.parse(stored);
+    return list.map((r) => ({
+      ...r,
+      id: r.id || r.reservationId,
+      reservationId: r.reservationId || r.id
+    }));
   } catch {
     return INITIAL_RESERVATIONS;
   }
@@ -215,17 +228,20 @@ export const createReservation = (data) =>
       );
 
       if (overlapping) {
-        const error = new Error(`Room ${data.roomNumber} is already booked from ${overlapping.checkInDate} to ${overlapping.checkOutDate}.`);
+        const message = `Room ${data.roomNumber} is not available for these dates`;
+        const error = new Error(message);
         error.response = {
           data: {
-            message: `Room ${data.roomNumber} is already booked from ${overlapping.checkInDate} to ${overlapping.checkOutDate}.`
+            message: message
           }
         };
         throw error;
       }
 
+      const newId = Date.now();
       const newRes = {
-        id: Date.now(),
+        id: newId,
+        reservationId: newId,
         ...data,
         status: data.status || "CONFIRMED"
       };
@@ -239,7 +255,7 @@ export const addReservation = createReservation;
 export const getReservationById = (id) =>
   withFallback(
     () => axios.get(`${RESERVATION_URL}/${id}`),
-    () => getDemoReservations().find((r) => String(r.id) === String(id)) || null
+    () => getDemoReservations().find((r) => matchesId(r, id)) || null
   );
 
 export const updateReservation = (id, data) =>
@@ -247,7 +263,7 @@ export const updateReservation = (id, data) =>
     () => axios.put(`${RESERVATION_URL}/${id}`, data),
     () => {
       const current = getDemoReservations();
-      const updated = current.map((r) => (String(r.id) === String(id) ? { ...r, ...data } : r));
+      const updated = current.map((r) => (matchesId(r, id) ? { ...r, ...data } : r));
       saveDemoReservations(updated);
       return data;
     }
@@ -258,9 +274,9 @@ export const updateReservationStatus = (id, status) =>
     () => axios.patch(`${RESERVATION_URL}/${id}/status`, null, { params: { status } }),
     () => {
       const current = getDemoReservations();
-      const updated = current.map((r) => (String(r.id) === String(id) ? { ...r, status } : r));
+      const updated = current.map((r) => (matchesId(r, id) ? { ...r, status } : r));
       saveDemoReservations(updated);
-      return { id, status };
+      return { id, reservationId: id, status };
     }
   );
 
@@ -269,7 +285,7 @@ export const deleteReservation = (id) =>
     () => axios.delete(`${RESERVATION_URL}/${id}`),
     () => {
       const current = getDemoReservations();
-      saveDemoReservations(current.filter((r) => String(r.id) !== String(id)));
+      saveDemoReservations(current.filter((r) => !matchesId(r, id)));
       return true;
     }
   );
